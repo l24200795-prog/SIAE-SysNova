@@ -1,0 +1,4 @@
+# Archivos subidos por usuarios (Multer): nunca se versionan
+*
+!.gitignore
+!.gitkeep
