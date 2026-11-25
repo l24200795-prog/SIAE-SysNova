@@ -176,6 +176,43 @@ export const buildLoginSchema = (dominioInstitucional: string) =>
     .strict();
 export type LoginRequest = z.infer<ReturnType<typeof buildLoginSchema>>;
 
+/**
+ * Roles que pueden crear su propia cuenta desde el formulario público.
+ * Docente, Personal y Administrador los da de alta un Administrador
+ * (POST /api/v1/usuarios) para evitar escalamiento de privilegios.
+ */
+export const ROLES_AUTORREGISTRO = ['Alumno'] as const satisfies readonly Rol[];
+
+/**
+ * POST /api/v1/auth/registro (público · SCRUM-11 / HU-008D).
+ * Autorregistro con correo institucional y matrícula. El hash BCrypt se genera
+ * en servidor. Duplicados de correo o matrícula → 409 CONFLICT.
+ * PROPUESTA pendiente de aprobación del líder técnico (Regla de equipo #4).
+ */
+export const buildRegistroSchema = (dominioInstitucional: string) =>
+  z
+    .object({
+      nombre: z
+        .string({ required_error: 'El nombre es obligatorio' })
+        .trim()
+        .min(1, 'El nombre es obligatorio')
+        .max(150, 'El nombre admite máximo 150 caracteres'),
+      correo: buildCorreoInstitucionalSchema(dominioInstitucional),
+      contrasena: contrasenaSchema,
+      // Obligatoria porque el único rol de autorregistro es Alumno (Tabla 31).
+      matricula: matriculaSchema,
+      rol: z.enum(ROLES_AUTORREGISTRO, {
+        errorMap: (issue) => ({
+          message:
+            issue.code === 'invalid_type' && issue.received === 'undefined'
+              ? 'El rol es obligatorio'
+              : 'Solo el rol Alumno puede registrarse; las demás cuentas las crea un Administrador',
+        }),
+      }),
+    })
+    .strict();
+export type RegistroRequest = z.infer<ReturnType<typeof buildRegistroSchema>>;
+
 /** POST /api/v1/auth/recuperar · Respuesta siempre 200 genérica (no revela si el correo existe). */
 export const solicitarRecuperacionSchema = z.object({ correo: correoSchema }).strict();
 export type SolicitarRecuperacionRequest = z.infer<typeof solicitarRecuperacionSchema>;
@@ -717,6 +754,7 @@ export const API_ROUTES = [
 
   // MOD-005 Identidad / RBAC
   { method: 'POST', path: '/api/v1/auth/login', modulo: 'MOD-005', ticket: 'SCRUM-15', roles: 'public', body: 'buildLoginSchema', descripcion: 'Inicio de sesión; emite cookie HttpOnly. Bloqueo tras 5 intentos/15 min (RNF-004)' },
+  { method: 'POST', path: '/api/v1/auth/registro', modulo: 'MOD-005', ticket: 'SCRUM-11', roles: 'public', body: 'buildRegistroSchema', descripcion: 'Autorregistro de Alumno con correo institucional y matrícula (BCrypt). 201 · 400 · 409' },
   { method: 'POST', path: '/api/v1/auth/logout', modulo: 'MOD-005', ticket: 'SCRUM-15', roles: 'authenticated', descripcion: 'Cierra sesión y limpia la cookie' },
   { method: 'GET', path: '/api/v1/auth/me', modulo: 'MOD-005', ticket: 'SCRUM-15', roles: 'authenticated', descripcion: 'Sesión actual (SesionDTO)' },
   { method: 'POST', path: '/api/v1/auth/recuperar', modulo: 'MOD-005', ticket: 'SCRUM-16', roles: 'public', body: 'solicitarRecuperacionSchema', descripcion: 'Envía enlace de recuperación por SMTP' },

@@ -3,6 +3,7 @@
  */
 import type { Server } from 'node:http';
 import { createApp } from './app';
+import { closePool } from './config/db';
 import { env } from './config/env';
 
 const app = createApp();
@@ -24,8 +25,12 @@ const shutdown = (signal: NodeJS.Signals): void => {
       console.error('[SIAE] Error al cerrar el servidor:', err);
       process.exit(1);
     }
-    // Aquí se cerrará el pool de mysql2 cuando exista (SCRUM-2 / SCRUM-11).
-    process.exit(0);
+    closePool()
+      .catch((poolErr: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error('[SIAE] Error al cerrar el pool de MySQL:', poolErr);
+      })
+      .finally(() => process.exit(0));
   });
   // Forzar salida si quedan conexiones colgadas.
   setTimeout(() => process.exit(1), 10_000).unref();

@@ -10,6 +10,7 @@ import express, { type Express, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { corsOrigins, env } from './config/env';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
+import { identidadRouter } from './modules/mod005-identidad/identidad.routes';
 import type { HealthResponse } from './schemas/api.contracts';
 import { ok } from './types/http.types';
 
@@ -55,7 +56,7 @@ export const createApp = (): Express => {
   });
 
   // --- Montaje de módulos (se habilitan en sus tickets) ---
-  // app.use(`${env.API_PREFIX}/auth`, identidadRouter);        // MOD-005 · SCRUM-15/16/17
+  app.use(`${env.API_PREFIX}/auth`, identidadRouter); // MOD-005 · SCRUM-11 (registro), 15/16/17
   // app.use(`${env.API_PREFIX}/periodos`, periodosRouter);     // MOD-002 · SCRUM-18
   // app.use(`${env.API_PREFIX}/aulas`, aulasRouter);           // MOD-002 · SCRUM-19
   // app.use(`${env.API_PREFIX}/actividades`, actividadesRouter); // MOD-002 · SCRUM-24

@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+/* Paleta institucional (README · Stack tecnológico). Genera clases como
+   bg-primario, text-error, border-exito, etc. */
+@theme {
+  --color-primario: #1d4ed8;
+  --color-fondo: #f8fafc;
+  --color-superficie: #ffffff;
+  --color-texto: #0f172a;
+  --color-exito: #15803d;
+  --color-error: #b91c1c;
+}
+
+body {
+  @apply bg-fondo text-texto antialiased;
+}

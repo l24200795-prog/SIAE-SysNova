@@ -244,6 +244,38 @@ npm run dev                       # http://localhost:3000/api/health
 | `npm start` | Ejecuta `dist/server.js` |
 | `npm run typecheck` | Verificación de tipos sin emitir |
 
+### Base de datos en local
+
+```bash
+mysql -u root -p < database/schema.sql   # crea la BD siae y la tabla USUARIO
+```
+
+### Frontend en local
+
+```bash
+cd frontend
+npm install
+npm run dev                       # http://localhost:5173 (pantalla de registro)
+```
+
+Opcional: crea `frontend/.env` con `VITE_API_URL=http://localhost:3000/api/v1` (es el valor por defecto).
+
+### Registro de usuarios (SCRUM-11 · HU-008D)
+
+`POST /api/v1/auth/registro` (público). Solo crea cuentas con rol `Alumno`; las cuentas de Docente, Personal y Administrador las crea un Administrador (`POST /api/v1/usuarios`).
+
+```bash
+curl -i -X POST http://localhost:3000/api/v1/auth/registro \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Ana López","correo":"l20200795@pachuca.tecnm.mx","contrasena":"Segura123","matricula":"20200795","rol":"Alumno"}'
+```
+
+| HTTP | `code` | Cuándo |
+|---|---|---|
+| 201 | — | Cuenta creada; responde el `UsuarioDTO` (nunca el hash) |
+| 400 | `VALIDATION_ERROR` | Correo no institucional, campos faltantes, matrícula faltante, rol distinto de `Alumno`, campos extra |
+| 409 | `CONFLICT` | Correo o matrícula ya registrados (`details.campos` indica cuál) |
+
 ### Docker Compose
 
 Los archivos de `docker/` se agregan en **SCRUM-11**. Una vez disponibles:
