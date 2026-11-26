@@ -47,6 +47,12 @@ const envSchema = z.object({
   SMTP_FROM: z.string().default('SIAE ITP <no-reply@pachuca.tecnm.mx>'),
 
   UPLOADS_DIR: z.string().default('uploads'),
+
+  /**
+   * Contraseña temporal del administrador inicial. SOLO la lee el seed
+   * (npm run seed:admin); el servidor no la usa. Vive únicamente en backend/.env.
+   */
+  SEED_ADMIN_PASSWORD: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

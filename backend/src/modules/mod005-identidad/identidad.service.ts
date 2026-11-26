@@ -1,5 +1,5 @@
 /**
- * MOD-005 · Identidad — Reglas de negocio del registro de cuentas.
+ * MOD-005 · Identidad — Reglas de negocio de cuentas e inicio de sesión.
  *
  * Cuando llega aquí, los datos ya pasaron la validación de FORMA con Zod
  * (validate.middleware). Esta capa aplica las reglas que dependen de la BD:
@@ -9,9 +9,22 @@
  */
 import bcrypt from 'bcryptjs';
 import { env } from '../../config/env';
-import type { RegistroRequest, UsuarioDTO } from '../../schemas/api.contracts';
+import type {
+  CrearUsuarioRequest,
+  LoginRequest,
+  RegistroRequest,
+  Rol,
+  UsuarioDTO,
+} from '../../schemas/api.contracts';
 import { AppError } from '../../types/http.types';
-import { buscarDuplicados, insertarUsuario, type Duplicados } from './identidad.repository';
+import {
+  buscarDuplicados,
+  buscarPorCorreo,
+  insertarUsuario,
+  listarUsuarios as listarUsuariosRepo,
+  type Duplicados,
+  type FiltrosUsuarios,
+} from './identidad.repository';
 
 const MENSAJE_CORREO_DUPLICADO = 'Este correo ya está registrado';
 const MENSAJE_MATRICULA_DUPLICADA = 'Esta matrícula ya está registrada';
@@ -50,7 +63,19 @@ const duplicadoDesdeMysql = (err: unknown): Duplicados | null => {
   };
 };
 
-export const registrarAlumno = async (datos: RegistroRequest): Promise<UsuarioDTO> => {
+interface DatosCuenta {
+  nombre: string;
+  correo: string;
+  contrasena: string;
+  matricula: string | null;
+  rol: Rol;
+}
+
+/**
+ * Crea una cuenta: verifica duplicados, hashea con BCrypt e inserta.
+ * Lo comparten el autorregistro (solo Alumno) y el alta por Administrador.
+ */
+const crearCuenta = async (datos: DatosCuenta): Promise<UsuarioDTO> => {
   const dup = await buscarDuplicados(datos.correo, datos.matricula);
   if (dup.correo || dup.matricula) throw errorDuplicado(dup);
 
@@ -79,4 +104,80 @@ export const registrarAlumno = async (datos: RegistroRequest): Promise<UsuarioDT
     rol: datos.rol,
     activo: true,
   };
+};
+
+/** Autorregistro público. El esquema Zod ya garantizó que rol === 'Alumno'. */
+export const registrarAlumno = (datos: RegistroRequest): Promise<UsuarioDTO> => crearCuenta(datos);
+
+/** Alta por Administrador (POST /usuarios): único camino para crear Docente, Personal o Administrador. */
+export const crearUsuario = (datos: CrearUsuarioRequest): Promise<UsuarioDTO> =>
+  crearCuenta({ ...datos, matricula: datos.matricula ?? null });
+
+export const listarUsuarios = (filtros: FiltrosUsuarios) => listarUsuariosRepo(filtros);
+
+/* ---- Inicio de sesión (SCRUM-15) -------------------------------------------- */
+
+/**
+ * Bloqueo por fuerza bruta (RNF-004): 5 contraseñas incorrectas en 15 min
+ * bloquean ese correo durante 15 min → 429.
+ * Se guarda en memoria del proceso: se reinicia al reiniciar el servidor y no se
+ * comparte entre varias instancias (suficiente para un solo contenedor backend).
+ */
+const MAX_INTENTOS = 5;
+const VENTANA_MS = 15 * 60 * 1000;
+const intentosFallidos = new Map<string, { fallos: number; desde: number; bloqueadoHasta: number }>();
+
+const verificarBloqueo = (correo: string): void => {
+  const registro = intentosFallidos.get(correo);
+  if (!registro) return;
+  const ahora = Date.now();
+  if (registro.bloqueadoHasta > ahora) {
+    const minutos = Math.ceil((registro.bloqueadoHasta - ahora) / 60_000);
+    throw new AppError(
+      429,
+      'TOO_MANY_REQUESTS',
+      `Demasiados intentos fallidos. Intenta de nuevo en ${minutos} minuto${minutos === 1 ? '' : 's'}.`,
+    );
+  }
+  if (ahora - registro.desde > VENTANA_MS) intentosFallidos.delete(correo);
+};
+
+const registrarFallo = (correo: string): void => {
+  const ahora = Date.now();
+  const previo = intentosFallidos.get(correo);
+  const registro =
+    previo && ahora - previo.desde <= VENTANA_MS ? previo : { fallos: 0, desde: ahora, bloqueadoHasta: 0 };
+  registro.fallos += 1;
+  if (registro.fallos >= MAX_INTENTOS) registro.bloqueadoHasta = ahora + VENTANA_MS;
+  intentosFallidos.set(correo, registro);
+};
+
+const errorCampo = (status: number, code: 'NOT_FOUND' | 'UNAUTHENTICATED', campo: string, mensaje: string) =>
+  new AppError(status, code, mensaje, { campos: [{ ruta: `body.${campo}`, mensaje, codigo: code.toLowerCase() }] });
+
+/**
+ * Verifica credenciales. La contraseña se compara SIEMPRE contra el hash BCrypt
+ * (bcrypt.compare); nunca se guarda ni se compara en texto plano.
+ */
+export const iniciarSesion = async (datos: LoginRequest): Promise<UsuarioDTO> => {
+  verificarBloqueo(datos.correo);
+
+  const usuario = await buscarPorCorreo(datos.correo);
+  if (!usuario) {
+    throw errorCampo(404, 'NOT_FOUND', 'correo', 'Esta cuenta no está registrada. Crea una cuenta para continuar.');
+  }
+
+  const coincide = await bcrypt.compare(datos.contrasena, usuario.contrasena_hash);
+  if (!coincide) {
+    registrarFallo(datos.correo);
+    throw errorCampo(401, 'UNAUTHENTICATED', 'contrasena', 'La contraseña es incorrecta.');
+  }
+
+  if (!usuario.activo) {
+    throw AppError.forbidden('Tu cuenta está desactivada. Contacta al administrador.');
+  }
+
+  intentosFallidos.delete(datos.correo);
+  const { contrasena_hash: _hash, ...publico } = usuario;
+  return publico;
 };

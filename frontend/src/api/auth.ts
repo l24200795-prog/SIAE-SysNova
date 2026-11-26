@@ -1,8 +1,8 @@
 /**
- * Endpoints de identidad (MOD-005). Los tipos reflejan RegistroRequest y
- * UsuarioDTO de backend/src/schemas/api.contracts.ts.
+ * Endpoints de identidad (MOD-005). Los tipos reflejan RegistroRequest,
+ * LoginRequest, UsuarioDTO y SesionDTO de backend/src/schemas/api.contracts.ts.
  */
-import { apiPost } from './client';
+import { apiGet, apiPost } from './client';
 
 export type Rol = 'Administrador' | 'Personal' | 'Docente' | 'Alumno';
 
@@ -26,3 +26,23 @@ export interface UsuarioDTO {
 /** POST /auth/registro → 201 con el usuario creado. */
 export const registrarUsuario = (datos: RegistroRequest): Promise<UsuarioDTO> =>
   apiPost<UsuarioDTO>('/auth/registro', datos);
+
+export interface LoginRequest {
+  correo: string;
+  contrasena: string;
+}
+
+export interface SesionDTO {
+  usuario: UsuarioDTO;
+  actividades_responsable: number[];
+}
+
+/** POST /auth/login → 200 con la sesión; el JWT llega en una cookie HttpOnly (JS no la ve). */
+export const iniciarSesion = (datos: LoginRequest): Promise<SesionDTO> =>
+  apiPost<SesionDTO>('/auth/login', datos);
+
+/** GET /auth/me → sesión actual, o ApiError 401 si no hay sesión. */
+export const obtenerSesion = (): Promise<SesionDTO> => apiGet<SesionDTO>('/auth/me');
+
+/** POST /auth/logout → el servidor borra la cookie. */
+export const cerrarSesion = (): Promise<unknown> => apiPost('/auth/logout');

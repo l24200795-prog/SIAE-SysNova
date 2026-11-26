@@ -47,14 +47,19 @@ const camposPorNombre = (campos: CampoErrorApi[] = []): Record<string, string> =
   return resultado;
 };
 
-export async function apiPost<T>(ruta: string, body: unknown): Promise<T> {
+type Metodo = 'GET' | 'POST';
+
+async function apiRequest<T>(metodo: Metodo, ruta: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${ruta}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      credentials: 'include', // necesario para la cookie HttpOnly de sesión (login)
-      body: JSON.stringify(body),
+      method: metodo,
+      headers: {
+        Accept: 'application/json',
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      credentials: 'include', // envía/recibe la cookie HttpOnly de sesión
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch {
     throw new ApiError(
@@ -81,3 +86,6 @@ export async function apiPost<T>(ruta: string, body: unknown): Promise<T> {
   }
   return json.data;
 }
+
+export const apiGet = <T>(ruta: string): Promise<T> => apiRequest<T>('GET', ruta);
+export const apiPost = <T>(ruta: string, body: unknown = {}): Promise<T> => apiRequest<T>('POST', ruta, body);

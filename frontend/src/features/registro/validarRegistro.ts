@@ -21,7 +21,13 @@ export type CampoRegistro = keyof RegistroForm;
 export type ErroresRegistro = Partial<Record<CampoRegistro, string>>;
 
 const FORMATO_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FORMATO_MATRICULA = /^[A-Za-z0-9]+$/;
+/** Número de control ITP: exactamente 8 dígitos (igual que matriculaSchema del backend). */
+export const MATRICULA_LONGITUD = 8;
+const FORMATO_MATRICULA = /^\d+$/;
+
+/** Deja solo dígitos y recorta a 8: evita escribir o pegar letras, espacios o símbolos. */
+export const limpiarMatricula = (valor: string): string =>
+  valor.replace(/\D/g, '').slice(0, MATRICULA_LONGITUD);
 
 /** Devuelve el mensaje de error de un campo, o undefined si es válido. */
 export function validarCampo(campo: CampoRegistro, form: RegistroForm): string | undefined {
@@ -45,8 +51,12 @@ export function validarCampo(campo: CampoRegistro, form: RegistroForm): string |
     case 'matricula': {
       const v = form.matricula.trim();
       if (form.rol === 'Alumno' && !v) return 'La matrícula es obligatoria para el rol Alumno';
-      if (v.length > 10) return 'La matrícula admite máximo 10 caracteres';
-      if (v && !FORMATO_MATRICULA.test(v)) return 'La matrícula solo admite letras y números';
+      if (v && !FORMATO_MATRICULA.test(v)) {
+        return 'La matrícula solo admite números (sin letras, espacios ni símbolos)';
+      }
+      if (v && v.length !== MATRICULA_LONGITUD) {
+        return `La matrícula debe tener exactamente ${MATRICULA_LONGITUD} dígitos (llevas ${v.length})`;
+      }
       return undefined;
     }
     case 'rol':

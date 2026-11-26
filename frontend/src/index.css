@@ -4,13 +4,38 @@
    bg-primario, text-error, border-exito, etc. */
 @theme {
   --color-primario: #1d4ed8;
+  /* Azul marino institucional: panel lateral y hover del botón principal */
+  --color-institucional: #1e3a8a;
   --color-fondo: #f8fafc;
   --color-superficie: #ffffff;
   --color-texto: #0f172a;
   --color-exito: #15803d;
   --color-error: #b91c1c;
+
+  /* Entrada suave de tarjetas y avisos (clase animate-aparecer) */
+  --animate-aparecer: aparecer 0.35s ease-out both;
+  @keyframes aparecer {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 body {
   @apply bg-fondo text-texto antialiased;
+}
+
+/* Respeta a quien pidió menos movimiento en su sistema operativo */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

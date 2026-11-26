@@ -71,14 +71,17 @@ export const idSchema = z.coerce
   .int('Debe ser un entero')
   .positive('Debe ser mayor que cero');
 
-/** Número de control / matrícula (USUARIO.matricula VARCHAR(10), RN-002). */
+/**
+ * Número de control / matrícula (USUARIO.matricula VARCHAR(10), RN-002).
+ * Formato ITP: exactamente 8 dígitos numéricos (ej. 24200824).
+ */
+export const MATRICULA_LONGITUD = 8;
 export const matriculaSchema = z
   .string({ required_error: 'La matrícula es obligatoria' })
   .trim()
   .min(1, 'La matrícula es obligatoria')
-  .max(10, 'La matrícula admite máximo 10 caracteres')
-  .regex(/^[A-Za-z0-9]+$/, 'La matrícula solo admite letras y números')
-  .transform((v) => v.toUpperCase());
+  .regex(/^\d+$/, 'La matrícula solo admite números (sin letras, espacios ni símbolos)')
+  .length(MATRICULA_LONGITUD, `La matrícula debe tener exactamente ${MATRICULA_LONGITUD} dígitos`);
 
 /** Correo genérico (USUARIO.correo VARCHAR(150)). */
 export const correoSchema = z

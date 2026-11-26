@@ -7,12 +7,27 @@
  *  3. Si todo está bien, se envía POST /auth/registro.
  *  4. 201 → mensaje de éxito y se limpia el formulario.
  *     400/409 → se muestran los mensajes del servidor debajo de cada campo.
+ *
+ * Diseño: AuthLayout + piezas de components/formulario (compartidas con Login).
  */
-import { useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ApiError } from '../../api/client';
 import { registrarUsuario } from '../../api/auth';
+import AuthLayout from '../../components/AuthLayout';
+import {
+  AvisoFormulario,
+  CLASE_BOTON_PRIMARIO,
+  Campo,
+  Spinner,
+  ariaProps,
+  claseControl,
+  type Aviso,
+} from '../../components/formulario';
 import {
   DOMINIO_INSTITUCIONAL,
+  MATRICULA_LONGITUD,
+  limpiarMatricula,
   validarCampo,
   validarRegistro,
   type CampoRegistro,
@@ -32,7 +47,7 @@ const FORM_INICIAL: RegistroForm = {
 /** Orden visual de los campos, para enfocar el primero con error. */
 const ORDEN_CAMPOS: CampoRegistro[] = ['nombre', 'correo', 'matricula', 'rol', 'contrasena', 'confirmacion'];
 
-type Aviso = { tipo: 'exito' | 'error'; texto: string } | null;
+const MENSAJE_SOLO_DIGITOS = 'Solo se permiten números: se ignoraron letras, espacios o símbolos.';
 
 export default function RegisterPage() {
   const [form, setForm] = useState<RegistroForm>(FORM_INICIAL);
@@ -49,8 +64,10 @@ export default function RegisterPage() {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const campo = e.target.name as CampoRegistro;
-    // La matrícula se guarda en mayúsculas, igual que en el backend.
-    const valor = campo === 'matricula' ? e.target.value.toUpperCase() : e.target.value;
+    // La matrícula solo acepta dígitos (máx. 8): se filtra al escribir o pegar.
+    const crudo = e.target.value;
+    const valor = campo === 'matricula' ? limpiarMatricula(crudo) : crudo;
+    const huboCaracteresInvalidos = campo === 'matricula' && /\D/.test(crudo);
     const siguiente = { ...form, [campo]: valor };
     setForm(siguiente);
 
@@ -58,6 +75,7 @@ export default function RegisterPage() {
     setErrores((prev) => {
       const nuevos = { ...prev };
       if (tocados[campo]) nuevos[campo] = validarCampo(campo, siguiente);
+      if (huboCaracteresInvalidos) nuevos.matricula = MENSAJE_SOLO_DIGITOS;
       if (campo === 'contrasena' && tocados.confirmacion) {
         nuevos.confirmacion = validarCampo('confirmacion', siguiente);
       }
@@ -119,187 +137,158 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <header className="mb-6 text-center">
-          <p className="text-sm font-semibold tracking-wide text-primario">SIAE · ITP</p>
-          <h1 className="mt-1 text-2xl font-bold">Crear cuenta</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Regístrate con tu correo institucional y tu número de control.
-          </p>
-        </header>
+    <AuthLayout titulo="Crear cuenta" subtitulo="Regístrate con tu correo institucional y tu número de control.">
+      <AvisoFormulario aviso={aviso}>
+        {aviso?.tipo === 'exito' && (
+          <>
+            {' '}
+            <Link to="/login" className="font-semibold underline underline-offset-2 hover:no-underline">
+              Inicia sesión
+            </Link>
+          </>
+        )}
+      </AvisoFormulario>
 
-        <section className="rounded-xl border border-slate-200 bg-superficie p-6 shadow-sm">
-          {aviso && (
-            <div
-              role={aviso.tipo === 'error' ? 'alert' : 'status'}
-              className={`mb-5 rounded-lg border px-4 py-3 text-sm ${
-                aviso.tipo === 'exito'
-                  ? 'border-exito/30 bg-exito/10 text-exito'
-                  : 'border-error/30 bg-error/10 text-error'
+      <form ref={formRef} onSubmit={handleSubmit} noValidate className="grid gap-5 sm:grid-cols-2">
+        <Campo id="nombre" etiqueta="Nombre completo" error={errores.nombre} className="sm:col-span-2">
+          <input
+            id="nombre"
+            name="nombre"
+            type="text"
+            autoComplete="name"
+            placeholder="Ej. Ana López Hernández"
+            maxLength={150}
+            value={form.nombre}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={claseControl(errores.nombre)}
+            {...ariaProps('nombre', errores.nombre)}
+          />
+        </Campo>
+
+        <Campo
+          id="correo"
+          etiqueta="Correo institucional"
+          error={errores.correo}
+          ayuda={`Debe terminar en @${DOMINIO_INSTITUCIONAL}`}
+          className="sm:col-span-2"
+        >
+          <input
+            id="correo"
+            name="correo"
+            type="email"
+            autoComplete="email"
+            placeholder={`l20200000@${DOMINIO_INSTITUCIONAL}`}
+            maxLength={150}
+            value={form.correo}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={claseControl(errores.correo)}
+            {...ariaProps('correo', errores.correo, true)}
+          />
+        </Campo>
+
+        <Campo
+          id="matricula"
+          etiqueta="Número de control"
+          error={errores.matricula}
+          ayuda={`Exactamente ${MATRICULA_LONGITUD} dígitos, solo números.`}
+          extra={
+            <span
+              aria-hidden
+              className={`text-xs font-medium tabular-nums ${
+                form.matricula.length === MATRICULA_LONGITUD ? 'text-exito' : 'text-slate-400'
               }`}
             >
-              {aviso.texto}
-            </div>
-          )}
+              {form.matricula.length}/{MATRICULA_LONGITUD}
+            </span>
+          }
+        >
+          <input
+            id="matricula"
+            name="matricula"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="username"
+            placeholder="24200824"
+            maxLength={MATRICULA_LONGITUD}
+            value={form.matricula}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`${claseControl(errores.matricula)} font-mono tracking-widest`}
+            {...ariaProps('matricula', errores.matricula, true)}
+          />
+        </Campo>
 
-          <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
-            <Campo id="nombre" etiqueta="Nombre completo" error={errores.nombre}>
-              <input
-                id="nombre"
-                name="nombre"
-                type="text"
-                autoComplete="name"
-                maxLength={150}
-                value={form.nombre}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.nombre)}
-                {...ariaProps('nombre', errores.nombre)}
-              />
-            </Campo>
+        <Campo
+          id="rol"
+          etiqueta="Rol"
+          error={errores.rol}
+          ayuda="Otros roles los asigna un administrador."
+        >
+          <select
+            id="rol"
+            name="rol"
+            value={form.rol}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={`${claseControl(errores.rol)} cursor-pointer`}
+            {...ariaProps('rol', errores.rol, true)}
+          >
+            <option value="Alumno">Alumno</option>
+            <option value="Docente" disabled>Docente (lo asigna un administrador)</option>
+            <option value="Personal" disabled>Personal (lo asigna un administrador)</option>
+            <option value="Administrador" disabled>Administrador (lo asigna un administrador)</option>
+          </select>
+        </Campo>
 
-            <Campo
-              id="correo"
-              etiqueta="Correo institucional"
-              error={errores.correo}
-              ayuda={`Debe terminar en @${DOMINIO_INSTITUCIONAL}`}
+        <Campo id="contrasena" etiqueta="Contraseña" error={errores.contrasena} ayuda="Mínimo 8 caracteres.">
+          <input
+            id="contrasena"
+            name="contrasena"
+            type="password"
+            autoComplete="new-password"
+            maxLength={72}
+            value={form.contrasena}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={claseControl(errores.contrasena)}
+            {...ariaProps('contrasena', errores.contrasena, true)}
+          />
+        </Campo>
+
+        <Campo id="confirmacion" etiqueta="Confirmar contraseña" error={errores.confirmacion}>
+          <input
+            id="confirmacion"
+            name="confirmacion"
+            type="password"
+            autoComplete="new-password"
+            maxLength={72}
+            value={form.confirmacion}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            className={claseControl(errores.confirmacion)}
+            {...ariaProps('confirmacion', errores.confirmacion)}
+          />
+        </Campo>
+
+        <div className="pt-1 sm:col-span-2">
+          <button type="submit" disabled={enviando} className={CLASE_BOTON_PRIMARIO}>
+            {enviando && <Spinner />}
+            {enviando ? 'Registrando…' : 'Crear cuenta'}
+          </button>
+          <p className="mt-5 text-center text-sm text-slate-600">
+            ¿Ya tienes cuenta?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-primario underline-offset-4 transition hover:text-institucional hover:underline"
             >
-              <input
-                id="correo"
-                name="correo"
-                type="email"
-                autoComplete="email"
-                placeholder={`l20200000@${DOMINIO_INSTITUCIONAL}`}
-                maxLength={150}
-                value={form.correo}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.correo)}
-                {...ariaProps('correo', errores.correo, true)}
-              />
-            </Campo>
-
-            <Campo
-              id="matricula"
-              etiqueta="Matrícula (número de control)"
-              error={errores.matricula}
-              ayuda="Obligatoria para alumnos. Solo letras y números."
-            >
-              <input
-                id="matricula"
-                name="matricula"
-                type="text"
-                autoComplete="username"
-                maxLength={10}
-                value={form.matricula}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.matricula)}
-                {...ariaProps('matricula', errores.matricula, true)}
-              />
-            </Campo>
-
-            <Campo
-              id="rol"
-              etiqueta="Rol"
-              error={errores.rol}
-              ayuda="Las cuentas de Docente, Personal y Administrador las crea un administrador."
-            >
-              <select
-                id="rol"
-                name="rol"
-                value={form.rol}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.rol)}
-                {...ariaProps('rol', errores.rol, true)}
-              >
-                <option value="Alumno">Alumno</option>
-                <option value="Docente" disabled>Docente (lo asigna un administrador)</option>
-                <option value="Personal" disabled>Personal (lo asigna un administrador)</option>
-                <option value="Administrador" disabled>Administrador (lo asigna un administrador)</option>
-              </select>
-            </Campo>
-
-            <Campo id="contrasena" etiqueta="Contraseña" error={errores.contrasena} ayuda="Mínimo 8 caracteres.">
-              <input
-                id="contrasena"
-                name="contrasena"
-                type="password"
-                autoComplete="new-password"
-                maxLength={72}
-                value={form.contrasena}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.contrasena)}
-                {...ariaProps('contrasena', errores.contrasena, true)}
-              />
-            </Campo>
-
-            <Campo id="confirmacion" etiqueta="Confirmar contraseña" error={errores.confirmacion}>
-              <input
-                id="confirmacion"
-                name="confirmacion"
-                type="password"
-                autoComplete="new-password"
-                maxLength={72}
-                value={form.confirmacion}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                className={claseControl(errores.confirmacion)}
-                {...ariaProps('confirmacion', errores.confirmacion)}
-              />
-            </Campo>
-
-            <button
-              type="submit"
-              disabled={enviando}
-              className="w-full rounded-lg bg-primario px-4 py-2.5 font-semibold text-white transition hover:bg-primario/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primario focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {enviando ? 'Registrando…' : 'Crear cuenta'}
-            </button>
-          </form>
-        </section>
-      </div>
-    </main>
-  );
-}
-
-/* ---- Piezas de presentación reutilizables dentro de este formulario ---- */
-
-function Campo(props: { id: string; etiqueta: string; error?: string; ayuda?: string; children: ReactNode }) {
-  const { id, etiqueta, error, ayuda, children } = props;
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium">
-        {etiqueta}
-      </label>
-      {children}
-      {error ? (
-        <p id={`${id}-error`} className="mt-1 text-sm text-error">
-          {error}
-        </p>
-      ) : (
-        ayuda && (
-          <p id={`${id}-ayuda`} className="mt-1 text-xs text-slate-500">
-            {ayuda}
+              Inicia sesión
+            </Link>
           </p>
-        )
-      )}
-    </div>
+        </div>
+      </form>
+    </AuthLayout>
   );
 }
-
-const claseControl = (error?: string): string =>
-  `block w-full rounded-lg border bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 ${
-    error
-      ? 'border-error focus:border-error focus:ring-error/30'
-      : 'border-slate-300 focus:border-primario focus:ring-primario/30'
-  }`;
-
-/** Enlaza el control con su mensaje para lectores de pantalla. */
-const ariaProps = (id: string, error?: string, tieneAyuda = false) => ({
-  'aria-invalid': error ? true : undefined,
-  'aria-describedby': error ? `${id}-error` : tieneAyuda ? `${id}-ayuda` : undefined,
-});

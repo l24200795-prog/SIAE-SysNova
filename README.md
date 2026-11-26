@@ -255,7 +255,7 @@ mysql -u root -p < database/schema.sql   # crea la BD siae y la tabla USUARIO
 ```bash
 cd frontend
 npm install
-npm run dev                       # http://localhost:5173 (pantalla de registro)
+npm run dev                       # http://localhost:5173 (login; registro en /registro)
 ```
 
 Opcional: crea `frontend/.env` con `VITE_API_URL=http://localhost:3000/api/v1` (es el valor por defecto).
@@ -275,6 +275,24 @@ curl -i -X POST http://localhost:3000/api/v1/auth/registro \
 | 201 | — | Cuenta creada; responde el `UsuarioDTO` (nunca el hash) |
 | 400 | `VALIDATION_ERROR` | Correo no institucional, campos faltantes, matrícula faltante, rol distinto de `Alumno`, campos extra |
 | 409 | `CONFLICT` | Correo o matrícula ya registrados (`details.campos` indica cuál) |
+
+### Inicio de sesión y roles (SCRUM-15 · HU-008A)
+
+- `POST /api/v1/auth/login` compara la contraseña con el hash BCrypt y emite el JWT en la cookie `HttpOnly` (`SameSite=Lax`, `Secure` en producción). `GET /auth/me` devuelve la sesión y `POST /auth/logout` la cierra.
+- En la pantalla se puede escribir el correo completo o solo el **usuario** (la parte antes de la `@`, p. ej. `admin.siae` o `l24200824`).
+- Respuestas: `404` cuenta no registrada · `401` contraseña incorrecta · `403` cuenta desactivada · `429` tras 5 contraseñas incorrectas en 15 min (bloqueo en memoria del proceso).
+- Paneles por rol: `/admin`, `/alumno`, `/docente`, `/personal`. El backend aplica `requireAuth` + `requireRole` (401/403); las guardas de React son solo UX.
+- `GET/POST /api/v1/usuarios` (solo Administrador): único camino para crear Docente, Personal o Administrador.
+
+**Administrador inicial** (una sola vez por base de datos):
+
+```bash
+# 1) En backend/.env (nunca en Git): SEED_ADMIN_PASSWORD='una-contraseña-fuerte'
+cd backend
+npm run seed:admin        # crea admin.siae@<CORREO_DOMINIO_INSTITUCIONAL>; si ya existe, no hace nada
+```
+
+Cambia la contraseña temporal después del primer inicio de sesión.
 
 ### Docker Compose
 
