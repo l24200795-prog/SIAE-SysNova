@@ -4,6 +4,8 @@
    bg-primario, text-error, border-exito, etc. */
 @theme {
   --color-primario: #1d4ed8;
+  /* Azul marino institucional: panel lateral y hover del botón principal */
+  --color-institucional: #1e3a8a;
   --color-fondo: #f8fafc;
   --color-superficie: #ffffff;
   --color-texto: #0f172a;
