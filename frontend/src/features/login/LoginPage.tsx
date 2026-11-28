@@ -9,8 +9,8 @@
  *  Errores: 404 cuenta no registrada · 401 contraseña incorrecta ·
  *           403 cuenta desactivada · 429 bloqueo por intentos fallidos.
  *
- * "¿Olvidaste tu contraseña?" no se muestra: la recuperación (SCRUM-16)
- * requiere SMTP configurado y aún no existe.
+ * "¿Olvidaste tu contraseña?" lleva a /recuperar-contrasena (SCRUM-16). Por
+ * ahora esa pantalla es solo interfaz: el envío por SMTP aún no existe.
  */
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -138,7 +138,19 @@ export default function LoginPage() {
           />
         </Campo>
 
-        <Campo id="contrasena" etiqueta="Contraseña" error={errores.contrasena}>
+        <Campo
+          id="contrasena"
+          etiqueta="Contraseña"
+          error={errores.contrasena}
+          extra={
+            <Link
+              to="/recuperar-contrasena"
+              className="text-sm font-medium text-primario underline-offset-4 transition hover:text-institucional hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          }
+        >
           <div className="relative">
             <input
               id="contrasena"

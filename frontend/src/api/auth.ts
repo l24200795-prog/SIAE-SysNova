@@ -46,3 +46,14 @@ export const obtenerSesion = (): Promise<SesionDTO> => apiGet<SesionDTO>('/auth/
 
 /** POST /auth/logout → el servidor borra la cookie. */
 export const cerrarSesion = (): Promise<unknown> => apiPost('/auth/logout');
+
+export interface SolicitarRecuperacionRequest {
+  correo: string;
+}
+
+/**
+ * POST /auth/recuperar → 200 genérico (no revela si el correo existe).
+ * Pendiente en el backend (SCRUM-16): aún no se llama desde la interfaz.
+ */
+export const solicitarRecuperacion = (datos: SolicitarRecuperacionRequest): Promise<unknown> =>
+  apiPost('/auth/recuperar', datos);

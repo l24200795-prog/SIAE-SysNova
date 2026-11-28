@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RedireccionInicial, RutaProtegida, SoloInvitados } from './auth/RutaProtegida';
 import { SesionProvider } from './auth/SesionContext';
 import LoginPage from './features/login/LoginPage';
+import RecuperarContrasenaPage from './features/recuperacion/RecuperarContrasenaPage';
 import PanelAdmin from './features/panel/PanelAdmin';
 import { PanelAlumno, PanelDocente, PanelPersonal } from './features/panel/PanelesRol';
 import RegisterPage from './features/registro/RegisterPage';
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<RedireccionInicial />} />
           <Route path="/login" element={<SoloInvitados><LoginPage /></SoloInvitados>} />
           <Route path="/registro" element={<SoloInvitados><RegisterPage /></SoloInvitados>} />
+          <Route path="/recuperar-contrasena" element={<SoloInvitados><RecuperarContrasenaPage /></SoloInvitados>} />
 
           <Route path="/admin" element={<RutaProtegida roles={['Administrador']}><PanelAdmin /></RutaProtegida>} />
           <Route path="/alumno" element={<RutaProtegida roles={['Alumno']}><PanelAlumno /></RutaProtegida>} />
